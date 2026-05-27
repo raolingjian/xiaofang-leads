@@ -46,8 +46,6 @@ tr:hover{background:#f0f4ff!important}
 .modal-overlay.show{display:flex}
 .modal-box{background:#fff;border-radius:14px;padding:24px;width:90%;max-width:480px;max-height:85vh;overflow-y:auto}
 .modal-box h3{margin-bottom:16px;color:#1a3a6b;font-size:17px}
-.modal-phone{font-size:22px;font-weight:700;color:#2563eb;text-align:center;padding:12px 0;margin-bottom:12px;background:#f0f4ff;border-radius:10px}
-.modal-phone small{font-size:14px;color:#888;font-weight:400}
 .result-btns{display:flex;gap:8px;margin-bottom:14px}
 .result-btns button{flex:1;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff;transition:all .2s}
 .result-btns button.active-ok{border-color:#059669;background:#d1fae5;color:#059669}
@@ -132,7 +130,10 @@ th,td{padding:7px 8px;font-size:12px}
 <div class="modal-overlay" id="callModal">
   <div class="modal-box">
     <h3>📞 通话记录</h3>
-    <div class="modal-phone" id="callPhone"><small>拨打</small><br>13800000000</div>
+    <div style="text-align:center;margin-bottom:14px">
+      <a id="callLink" href="tel:13800000000" style="display:block;background:#2563eb;color:#fff;text-decoration:none;border-radius:10px;padding:14px;font-size:18px;font-weight:700">📞 拨打 13800000000</a>
+      <button id="copyPhoneBtn" onclick="copyPhone()" style="background:none;border:none;color:#2563eb;font-size:13px;cursor:pointer;margin-top:6px">📋 复制号码</button>
+    </div>
     <div class="result-btns">
       <button id="resOk" onclick="setResult('ok')">✅ 已接通</button>
       <button id="resMiss" onclick="setResult('miss')">❌ 无人接听</button>
@@ -259,7 +260,10 @@ function setResult(r) {
 
 async function openCallModal(id, phone, name) {
   selectedLead = { id, phone, name };
-  document.getElementById('callPhone').innerHTML = `<small>拨打 ${esc(name)}</small><br>${esc(phone)}`;
+  const callLink = document.getElementById('callLink');
+  callLink.href = 'tel:' + phone;
+  callLink.innerHTML = '📞 拨打 ' + phone;
+  document.getElementById('copyPhoneBtn').setAttribute('data-phone', phone);
   setResult('ok');
   document.getElementById('callNote').value = '';
   document.getElementById('callFollowup').value = '';
@@ -276,6 +280,12 @@ async function openCallModal(id, phone, name) {
       document.getElementById('callHistory').innerHTML = '<div style="font-size:12px;color:#aaa;text-align:center;padding:8px 0">暂无通话记录</div>';
     }
   } catch {}
+}
+
+function copyPhone() {
+  const phone = document.getElementById('copyPhoneBtn').getAttribute('data-phone');
+  if (!phone) return;
+  navigator.clipboard.writeText(phone).then(() => showToast('✅ 已复制号码: ' + phone)).catch(() => showToast('❌ 复制失败'));
 }
 
 function closeCallModal() {
