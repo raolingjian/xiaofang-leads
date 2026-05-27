@@ -119,24 +119,35 @@ tr:hover{background:#fafbff}
 <div class="toast" id="toast"></div>
 
 <script>
-const API = '/api/leads';
+const SUPABASE_URL = 'https://bmgfwpxqscdwrmqznhas.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZ2Z3cHhxc2Nkd3JtcXpuaGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjAzODcsImV4cCI6MjA5NTM5NjM4N30.U6bUA8d-FYW9svXwZHAImsJVcfGM1l2GQESUTYqi4Bc';
+const SB = SUPABASE_URL + '/rest/v1/leads';
+const HEADERS = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': 'Bearer ' + SUPABASE_KEY,
+  'Content-Type': 'application/json'
+};
+
+function fmtTime(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return d.getFullYear() + '/' + (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getDate().toString().padStart(2,'0') + ' ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
 
 async function loadLeads() {
   const status = document.getElementById('statusFilter').value;
   const keyword = document.getElementById('searchInput').value.trim();
-  let url = API;
-  const params = [];
-  if (status !== 'all') params.push('status=' + status);
-  if (keyword) params.push('keyword=' + encodeURIComponent(keyword));
-  if (params.length) url += '?' + params.join('&');
+  let url = SB + '?select=*&order=created_at.desc';
+  if (status !== 'all') url += '&status=eq.' + status;
+  if (keyword) url += '&or=(name.ilike.*' + encodeURIComponent(keyword) + '*,phone.ilike.*' + encodeURIComponent(keyword) + '*)';
 
   try {
-    const res = await fetch(url);
-    const result = await res.json();
-    if (!result.ok) return;
-    renderTable(result.data);
-    document.getElementById('totalCount').textContent = result.total;
-    document.getElementById('filterCount').textContent = '显示 ' + result.data.length + ' 条';
+    const res = await fetch(url, { headers: HEADERS });
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+    renderTable(data);
+    document.getElementById('totalCount').textContent = data.length;
+    document.getElementById('filterCount').textContent = '显示 ' + data.length + ' 条';
   } catch {}
 }
 
@@ -149,11 +160,11 @@ function renderTable(leads) {
   const statusMap = { new:'新线索', contacted:'已联系', converted:'已报名', lost:'无意向' };
   tbody.innerHTML = leads.map(l => `
     <tr>
-      <td><strong>${l.name}</strong></td>
-      <td><a href="tel:${l.phone}" style="color:#2563eb;text-decoration:none">${l.phone}</a></td>
-      <td class="hide-mobile">${l.source || '-'}</td>
-      <td class="hide-mobile" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.note || '-'}</td>
-      <td class="hide-mobile" style="font-size:12px;color:#888">${l.createdAt || '-'}</td>
+      <td><strong>${esc(l.name)}</strong></td>
+      <td><a href="tel:${esc(l.phone)}" style="color:#2563eb;text-decoration:none">${esc(l.phone)}</a></td>
+      <td class="hide-mobile">${esc(l.source || '-')}</td>
+      <td class="hide-mobile" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.note || '-')}</td>
+      <td class="hide-mobile" style="font-size:12px;color:#888">${fmtTime(l.created_at)}</td>
       <td><span class="status-badge status-${l.status}">${statusMap[l.status] || l.status}</span></td>
       <td nowrap>
         <button class="action-btn btn-contact" onclick="updateStatus('${l.id}','contacted')">📞 已联系</button>
@@ -165,15 +176,16 @@ function renderTable(leads) {
   `).join('');
 }
 
+function esc(s) { return String(s).replace(/[&<>"]/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+
 async function updateStatus(id, status) {
   try {
-    const res = await fetch(API + '/' + id, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch(SB + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: HEADERS,
       body: JSON.stringify({ status })
     });
-    const result = await res.json();
-    if (result.ok) {
+    if (res.ok) {
       showToast('✅ 状态已更新');
       loadLeads();
     }
@@ -183,9 +195,11 @@ async function updateStatus(id, status) {
 async function deleteLead(id) {
   if (!confirm('确认删除该线索？')) return;
   try {
-    const res = await fetch(API + '/' + id, { method: 'DELETE' });
-    const result = await res.json();
-    if (result.ok) {
+    const res = await fetch(SB + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: HEADERS
+    });
+    if (res.ok) {
       showToast('🗑 已删除');
       loadLeads();
     }
@@ -198,7 +212,6 @@ function exportCSV() {
     showToast('❌ 没有数据可导出');
     return;
   }
-  const statusMap = { new:'新线索', contacted:'已联系', converted:'已报名', lost:'无意向' };
   let csv = '\uFEFF姓名,手机号,来源,留言,时间,状态\n';
   rows.forEach(tr => {
     const tds = tr.querySelectorAll('td');

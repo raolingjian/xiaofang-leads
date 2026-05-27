@@ -221,6 +221,9 @@ body{background:#f5f7fa;color:#333;line-height:1.6}
 <div class="toast" id="toast"></div>
 
 <script>
+const SUPABASE_URL = 'https://bmgfwpxqscdwrmqznhas.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZ2Z3cHhxc2Nkd3JtcXpuaGFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjAzODcsImV4cCI6MjA5NTM5NjM4N30.U6bUA8d-FYW9svXwZHAImsJVcfGM1l2GQESUTYqi4Bc';
+
 function toggleFaq(el) {
   el.classList.toggle('active');
   const answer = el.nextElementSibling;
@@ -233,24 +236,31 @@ document.getElementById('leadForm').addEventListener('submit', async function(e)
   btn.disabled = true;
   btn.innerHTML = '<span class="loading"></span>提交中...';
 
-  const formData = {
+  const payload = {
     name: this.name.value.trim(),
     phone: this.phone.value.trim(),
-    note: this.note.value.trim()
+    note: this.note.value.trim() || '',
+    source: navigator.userAgent.includes('Mobile') ? '手机端' : '电脑端',
+    status: 'new'
   };
 
   try {
-    const res = await fetch('/api/leads', {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/leads', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(payload)
     });
-    const result = await res.json();
-    if (result.ok) {
-      showToast('✅ 提交成功！\n我们的课程顾问将在15分钟内联系你');
+    if (res.ok) {
+      showToast('✅ 提交成功！我们的课程顾问将在15分钟内联系你');
       this.reset();
     } else {
-      showToast('❌ ' + result.msg);
+      const err = await res.json();
+      showToast('❌ ' + (err.message || '提交失败'));
     }
   } catch {
     showToast('❌ 网络错误，请稍后重试');
